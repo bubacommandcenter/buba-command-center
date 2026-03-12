@@ -98,7 +98,6 @@ export function parsePipeline(markdown: string): {
     const nextStep = extractField(body, 'Next Action') ?? extractField(body, 'Next action') ?? null;
     const notes = extractField(body, 'Notes') ?? null;
     const owner = extractField(body, 'Owner') ?? null;
-    const details = extractField(body, 'Details') ?? '';
 
     const type = inferType(name, `${body} ${lines[0]}`);
 

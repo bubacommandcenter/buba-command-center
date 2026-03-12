@@ -135,7 +135,6 @@ export function parseActionItems(markdown: string): ParseResult<ActionItem> {
 
     // Priority heuristic
     let priority: ActionItem['priority'] = null;
-    const titleLower = rawTitle.toLowerCase();
     const combined = `${rawTitle} ${fullText}`.toLowerCase();
     if (/🚨|⚠️|hard deadline|p1|urgent/i.test(combined)) {
       priority = 'high';
