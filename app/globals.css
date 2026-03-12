@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: #030712;
+}
+
+/* ── Frappe Gantt priority color overrides ─────────────────── */
+.gantt .bar-wrapper.priority-high .bar { fill: #ef4444; }
+.gantt .bar-wrapper.priority-medium .bar { fill: #f59e0b; }
+.gantt .bar-wrapper.priority-low .bar { fill: #3b82f6; }
+
+/* Blocked / on-hold: muted striped */
+.gantt .bar-wrapper.status-blocked .bar,
+.gantt .bar-wrapper.status-on-hold .bar {
+  fill: #6b7280;
+  opacity: 0.5;
+}
+
+/* Dark Gantt background */
+.gantt-wrapper svg {
+  background: transparent;
+}
+.gantt .grid-background { fill: transparent; }
+.gantt .grid-header { fill: #111827; }
+.gantt .grid-row { fill: transparent; }
+.gantt .grid-row:nth-child(even) { fill: #111827; }
+.gantt .tick { stroke: #374151; }
+.gantt .today-highlight { fill: #1e3a5f; opacity: 0.4; }
+.gantt .bar-label { fill: #f9fafb; font-size: 11px; }
+.gantt .lower-text, .gantt .upper-text { fill: #9ca3af; }
