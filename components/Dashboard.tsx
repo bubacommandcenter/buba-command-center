@@ -10,7 +10,6 @@ import LoadingState from './LoadingState';
 import ErrorBanner from './ErrorBanner';
 import NudgeBanner from './NudgeBanner';
 import QuestionPanel from './QuestionPanel';
-import { generateQuestions } from '@/lib/questions';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -196,18 +195,9 @@ export default function Dashboard() {
               />
             </div>
 
-            {(() => {
-              const questions = generateQuestions(
-                data.actionItems.data,
-                data.pipeline.data,
-                data.projects.data,
-              );
-              return questions.length > 0 ? (
-                <div className="bg-[#0d1117] border border-white/[0.08] rounded-2xl p-5">
-                  <QuestionPanel questions={questions} onRefetch={() => fetchData(true)} />
-                </div>
-              ) : null;
-            })()}
+            <div className="bg-[#0d1117] border border-white/[0.08] rounded-2xl p-5">
+              <QuestionPanel onRefetch={() => fetchData(true)} />
+            </div>
           </div>
         </main>
       )}

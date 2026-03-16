@@ -92,6 +92,51 @@ export async function updateFileContent(
   });
 }
 
+const EXCLUDE_NAMES = /prompt|readme|setup/i;
+
+/** Fetch every .md file in the folder (excluding meta/prompt files). Used by the AI question engine. */
+export async function fetchAllMarkdownFiles(
+  accessToken: string
+): Promise<Array<{ name: string; content: string }>> {
+  const drive = getDriveClient(accessToken);
+
+  const listRes = await drive.files.list({
+    q: `'${FOLDER_ID}' in parents and trashed = false`,
+    fields: 'files(id, name, modifiedTime)',
+    pageSize: 50,
+  });
+
+  const files = (listRes.data.files ?? []).filter(
+    (f) => f.name?.endsWith('.md') && !EXCLUDE_NAMES.test(f.name ?? '')
+  );
+
+  const results: Array<{ name: string; content: string }> = [];
+
+  for (const file of files) {
+    if (!file.id || !file.name) continue;
+    const cacheKey = `${file.id}::${file.modifiedTime ?? ''}`;
+    let content: string;
+    if (contentCache.has(cacheKey)) {
+      content = contentCache.get(cacheKey)!;
+    } else {
+      try {
+        const fileRes = await drive.files.get(
+          { fileId: file.id, alt: 'media' },
+          { responseType: 'text' }
+        );
+        content = typeof fileRes.data === 'string' ? fileRes.data : JSON.stringify(fileRes.data);
+        contentCache.set(cacheKey, content);
+        fileIdMap.set(file.name, file.id);
+      } catch {
+        continue;
+      }
+    }
+    results.push({ name: file.name, content });
+  }
+
+  return results;
+}
+
 export async function fetchMarkdownFiles(
   accessToken: string
 ): Promise<Record<string, DriveFileContent>> {

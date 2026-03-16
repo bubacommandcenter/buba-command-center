@@ -1,165 +1,209 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { Question, formatQuestionsForEmail } from '@/lib/questions';
+import { useState, useEffect, useCallback } from 'react';
+import type { AiQuestion } from '@/app/api/questions/route';
 
-function CopyIcon() {
+function RefreshIcon({ spinning }: { spinning: boolean }) {
   return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg
+      className={`w-3.5 h-3.5 ${spinning ? 'animate-spin' : ''}`}
+      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+    >
       <path strokeLinecap="round" strokeLinejoin="round"
-        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-4 12h6a2 2 0 002-2v-8a2 2 0 00-2-2h-6a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0114.13-3.36M20 15a9 9 0 01-14.13 3.36" />
     </svg>
   );
 }
 
 function QuestionCard({
   question,
-  onRefetch,
+  onAnswered,
 }: {
-  question: Question;
-  onRefetch?: () => void;
+  question: AiQuestion;
+  onAnswered: () => void;
 }) {
-  const [editValue, setEditValue] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [answer, setAnswer] = useState('');
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isActionable = question.action.type === 'update-lead-nextstep';
+  const canSave = answer.trim().length > 0 && !saving && !saved;
 
   const handleSave = useCallback(async () => {
-    if (question.action.type !== 'update-lead-nextstep') return;
-    if (!editValue.trim()) return;
+    if (!canSave) return;
 
-    setIsSaving(true);
+    setSaving(true);
     setError(null);
 
-    try {
-      const res = await fetch('/api/drive/update-lead', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId: question.action.leadId, nextStep: editValue.trim() }),
-      });
+    if (question.writeBack) {
+      try {
+        const res = await fetch('/api/drive/answer-question', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: question.writeBack.fileName,
+            entryName: question.writeBack.entryName,
+            fieldName: question.writeBack.fieldName,
+            answer: answer.trim(),
+          }),
+        });
 
-      if (res.status === 401) {
-        window.location.href = '/login';
+        if (res.status === 401) { window.location.href = '/login'; return; }
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `HTTP ${res.status}`);
+        }
+      } catch (err) {
+        setError((err as Error).message);
+        setSaving(false);
         return;
       }
-
-      if (!res.ok) {
-        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
-      }
-
-      setSaved(true);
-      onRefetch?.();
-    } catch {
-      setError("Couldn't save — try again");
-    } finally {
-      setIsSaving(false);
     }
-  }, [question.action, editValue, onRefetch]);
+
+    setSaving(false);
+    setSaved(true);
+    onAnswered();
+  }, [answer, canSave, question.writeBack, onAnswered]);
 
   const priorityDot =
-    question.priority === 'high'
-      ? 'bg-red-400/70'
-      : question.priority === 'medium'
-      ? 'bg-amber-400/60'
-      : 'bg-white/20';
+    question.priority === 'high' ? 'bg-red-400/70'
+    : question.priority === 'medium' ? 'bg-amber-400/60'
+    : 'bg-white/20';
 
   return (
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-3.5 py-3 space-y-2.5">
-      {/* Context + priority */}
       <div className="flex items-center gap-2">
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityDot}`} />
         <span className="text-[10px] text-white/30 font-medium tracking-wide">{question.context}</span>
+        {question.writeBack && (
+          <span className="text-[10px] text-white/20 ml-auto">saves to {question.writeBack.fileName}</span>
+        )}
       </div>
 
-      {/* Question text */}
-      <p className="text-[13px] text-white/70 leading-snug pl-3.5">
-        {question.text}
-      </p>
+      <p className="text-[13px] text-white/75 leading-snug pl-3.5">{question.text}</p>
 
-      {/* Actionable: inline next-step input */}
-      {isActionable && !saved && (
+      {!saved ? (
         <div className="pl-3.5 space-y-2">
           <textarea
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            placeholder="Type next step..."
-            disabled={isSaving}
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            placeholder={question.writeBack ? 'Type answer to save to file…' : 'Type your answer…'}
+            disabled={saving}
             rows={2}
-            className="w-full px-2 py-1.5 text-[11px] bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-white/40 disabled:opacity-50 resize-none"
+            className="w-full px-2 py-1.5 text-[11px] bg-white/[0.07] border border-white/[0.12] rounded text-white placeholder-white/25 focus:outline-none focus:border-white/30 disabled:opacity-50 resize-none"
           />
           <div className="flex items-center justify-between">
-            {error && <p className="text-[10px] text-red-400">{error}</p>}
+            {error && <p className="text-[10px] text-red-400 flex-1 mr-2">{error}</p>}
             <button
               onClick={handleSave}
-              disabled={isSaving || !editValue.trim()}
-              className="ml-auto text-[10px] px-2.5 py-1 rounded bg-green-500/20 text-green-400 hover:bg-green-500/30 disabled:opacity-40 transition-colors"
+              disabled={!canSave}
+              className="ml-auto text-[10px] px-2.5 py-1 rounded bg-white/10 text-white/50 hover:bg-white/15 hover:text-white/70 disabled:opacity-30 transition-colors"
             >
-              {isSaving ? 'Saving…' : 'Save next step'}
+              {saving ? 'Saving…' : question.writeBack ? 'Save to file' : 'Note it'}
             </button>
           </div>
         </div>
-      )}
-
-      {/* Saved confirmation */}
-      {isActionable && saved && (
-        <p className="pl-3.5 text-[11px] text-green-400/70">Saved.</p>
+      ) : (
+        <p className="pl-3.5 text-[11px] text-green-400/60">
+          {question.writeBack ? 'Saved to file.' : 'Noted.'}
+        </p>
       )}
     </div>
   );
 }
 
 interface Props {
-  questions: Question[];
   onRefetch?: () => void;
 }
 
-export default function QuestionPanel({ questions, onRefetch }: Props) {
-  const [copied, setCopied] = useState(false);
+export default function QuestionPanel({ onRefetch }: Props) {
+  const [questions, setQuestions] = useState<AiQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [answeredCount, setAnsweredCount] = useState(0);
 
-  if (questions.length === 0) return null;
+  const loadQuestions = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/questions');
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setQuestions(data.questions ?? []);
+      setAnsweredCount(0);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleCopy = () => {
-    const text = formatQuestionsForEmail(questions);
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
+  useEffect(() => { loadQuestions(); }, [loadQuestions]);
+
+  const handleAnswered = useCallback(() => {
+    setAnsweredCount((n) => n + 1);
+    onRefetch?.();
+  }, [onRefetch]);
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-base">🤔</span>
           <h2 className="text-sm font-semibold text-white">Questions</h2>
-          <span className="text-[10px] font-bold text-white/40 bg-white/10 px-1.5 py-0.5 rounded">
-            {questions.length}
-          </span>
+          {!loading && questions.length > 0 && (
+            <span className="text-[10px] font-bold text-white/40 bg-white/10 px-1.5 py-0.5 rounded">
+              {questions.length - answeredCount > 0 ? questions.length - answeredCount : '✓'}
+            </span>
+          )}
         </div>
         <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 text-[11px] text-white/35 hover:text-white/60 transition-colors"
-          title="Copy all as email"
+          onClick={loadQuestions}
+          disabled={loading}
+          className="flex items-center gap-1.5 text-[11px] text-white/35 hover:text-white/60 transition-colors disabled:opacity-30"
+          title="Regenerate questions"
         >
-          <CopyIcon />
-          {copied ? 'Copied!' : 'Copy for email'}
+          <RefreshIcon spinning={loading} />
+          {loading ? 'Thinking…' : 'Refresh'}
         </button>
       </div>
 
-      {/* Questions list */}
-      <div className="space-y-2.5">
-        {questions.map((q) => (
-          <QuestionCard key={q.id} question={q} onRefetch={onRefetch} />
-        ))}
-      </div>
+      {loading && (
+        <div className="space-y-2.5">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-3.5 py-3 space-y-2.5 animate-pulse">
+              <div className="h-2 w-24 bg-white/10 rounded" />
+              <div className="h-3 w-full bg-white/10 rounded" />
+              <div className="h-3 w-3/4 bg-white/10 rounded" />
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Footer hint */}
-      <p className="text-[10px] text-white/15 mt-3 pl-1">
-        Answers to pipeline questions save directly. Others: copy and email yourself.
-      </p>
+      {!loading && error && (
+        <div className="text-[12px] text-red-400/80 bg-red-500/[0.07] border border-red-500/20 rounded-lg px-3 py-2.5">
+          {error.includes('ANTHROPIC_API_KEY')
+            ? 'Add ANTHROPIC_API_KEY to your Vercel environment variables.'
+            : error}
+        </div>
+      )}
+
+      {!loading && !error && questions.length === 0 && (
+        <p className="text-white/30 text-sm">No questions generated — try refreshing.</p>
+      )}
+
+      {!loading && !error && questions.length > 0 && (
+        <div className="space-y-2.5">
+          {questions.map((q) => (
+            <QuestionCard key={q.id} question={q} onAnswered={handleAnswered} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
