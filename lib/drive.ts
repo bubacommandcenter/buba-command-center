@@ -24,6 +24,74 @@ function getDriveClient(accessToken: string) {
 // Simple in-memory cache: { fileId+modifiedTime -> content }
 const contentCache = new Map<string, string>();
 
+// Tracks fileName -> fileId so we can invalidate the cache after writes
+const fileIdMap = new Map<string, string>();
+
+/** Remove all cached content for a given file so the next poll fetches fresh data. */
+export function invalidateFileCache(fileName: string): void {
+  const fileId = fileIdMap.get(fileName);
+  if (!fileId) return;
+  Array.from(contentCache.keys())
+    .filter((key) => key.startsWith(`${fileId}::`))
+    .forEach((key) => contentCache.delete(key));
+}
+
+/**
+ * Fetch the raw content of a single file by name, bypassing the cache.
+ * Returns the fileId so the caller can pass it to updateFileContent.
+ */
+export async function fetchFileForUpdate(
+  accessToken: string,
+  fileName: string
+): Promise<{ fileId: string; content: string }> {
+  const drive = getDriveClient(accessToken);
+
+  // Find the file ID (use cached value if available)
+  let fileId = fileIdMap.get(fileName);
+
+  if (!fileId) {
+    const listRes = await drive.files.list({
+      q: `'${FOLDER_ID}' in parents and name = '${fileName}' and trashed = false`,
+      fields: 'files(id, name)',
+      pageSize: 1,
+    });
+    const files = listRes.data.files ?? [];
+    if (files.length === 0 || !files[0].id) {
+      throw new Error(`File "${fileName}" not found in Drive folder.`);
+    }
+    fileId = files[0].id;
+    fileIdMap.set(fileName, fileId);
+  }
+
+  const fileRes = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'text' }
+  );
+
+  const content =
+    typeof fileRes.data === 'string'
+      ? fileRes.data
+      : JSON.stringify(fileRes.data);
+
+  return { fileId, content };
+}
+
+/** Write updated content back to a Drive file. */
+export async function updateFileContent(
+  accessToken: string,
+  fileId: string,
+  newContent: string
+): Promise<void> {
+  const drive = getDriveClient(accessToken);
+  await drive.files.update({
+    fileId,
+    media: {
+      mimeType: 'text/plain',
+      body: newContent,
+    },
+  });
+}
+
 export async function fetchMarkdownFiles(
   accessToken: string
 ): Promise<Record<string, DriveFileContent>> {
@@ -51,6 +119,9 @@ export async function fetchMarkdownFiles(
       };
       continue;
     }
+
+    // Keep fileName -> fileId mapping up to date for cache invalidation
+    fileIdMap.set(target, file.id);
 
     const cacheKey = `${file.id}::${file.modifiedTime ?? ''}`;
 

@@ -8,7 +8,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: 'openid email profile https://www.googleapis.com/auth/drive.readonly',
+          // Full Drive scope required for write-back (check-off feature).
+          // NOTE: Fritz must sign out and sign back in once after this change to grant the new scope.
+          scope: 'openid email profile https://www.googleapis.com/auth/drive',
           access_type: 'offline',
           prompt: 'consent',
         },
