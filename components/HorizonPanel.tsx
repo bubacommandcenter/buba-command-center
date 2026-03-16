@@ -109,13 +109,18 @@ function ProjectCard({ project }: { project: Project }) {
   );
 }
 
+function syncedAt(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 interface Props {
   projects: Project[];
   error: string | null;
   isMobile: boolean;
+  fetchedAt?: string;
 }
 
-export default function HorizonPanel({ projects, error }: Props) {
+export default function HorizonPanel({ projects, error, fetchedAt }: Props) {
   const [showInactive, setShowInactive] = useState(false);
 
   const active = projects
@@ -137,7 +142,7 @@ export default function HorizonPanel({ projects, error }: Props) {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-base">📅</span>
           <h2 className="text-sm font-semibold text-white">Horizon</h2>
@@ -152,13 +157,22 @@ export default function HorizonPanel({ projects, error }: Props) {
             </span>
           )}
         </div>
-        <span className="text-xs text-white/30">{projects.length} projects</span>
+        <div className="flex items-center gap-2">
+          {fetchedAt && (
+            <span className="text-[10px] text-white/20">synced {syncedAt(fetchedAt)}</span>
+          )}
+          <span className="text-xs text-white/30">{projects.length} projects</span>
+        </div>
       </div>
+      <div className="mb-4" />
 
       {error && <ErrorBanner message="Could not read projects.md. Check file format." />}
 
       {!error && projects.length === 0 && (
-        <p className="text-white/30 text-sm">No projects found.</p>
+        <div className="py-8 flex flex-col items-center gap-1">
+          <p className="text-white/40 text-sm">No active projects.</p>
+          <p className="text-white/20 text-xs">Add entries to projects.md to track workstreams.</p>
+        </div>
       )}
 
       {!error && projects.length > 0 && (

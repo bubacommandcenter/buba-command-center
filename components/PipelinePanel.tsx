@@ -188,13 +188,18 @@ function LeadCard({
   );
 }
 
+function syncedAt(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 interface Props {
   leads: PipelineLead[];
   stages: string[];
   error: string | null;
+  fetchedAt?: string;
 }
 
-export default function PipelinePanel({ leads, stages, error }: Props) {
+export default function PipelinePanel({ leads, stages, error, fetchedAt }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -268,7 +273,7 @@ export default function PipelinePanel({ leads, stages, error }: Props) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-base">🤝</span>
           <h2 className="text-sm font-semibold text-white">Pipeline</h2>
@@ -278,13 +283,22 @@ export default function PipelinePanel({ leads, stages, error }: Props) {
             </span>
           )}
         </div>
-        <span className="text-xs text-white/30">{leads.length} leads</span>
+        <div className="flex items-center gap-2">
+          {fetchedAt && (
+            <span className="text-[10px] text-white/20">synced {syncedAt(fetchedAt)}</span>
+          )}
+          <span className="text-xs text-white/30">{leads.length} leads</span>
+        </div>
       </div>
+      <div className="mb-4" />
 
       {error && <ErrorBanner message="Could not read collab_pipeline.md. Check file format." />}
 
       {!error && leads.length === 0 && (
-        <p className="text-white/30 text-sm">No pipeline leads found.</p>
+        <div className="py-8 flex flex-col items-center gap-1">
+          <p className="text-white/40 text-sm">No leads yet.</p>
+          <p className="text-white/20 text-xs">Add entries to collab_pipeline.md to track outreach.</p>
+        </div>
       )}
 
       {!error && leads.length > 0 && (

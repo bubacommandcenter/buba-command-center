@@ -147,13 +147,18 @@ function ActionCard({
   );
 }
 
+function syncedAt(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 interface Props {
   items: ActionItem[];
   error: string | null;
   onRefetch?: () => void;
+  fetchedAt?: string;
 }
 
-export default function TodayPanel({ items, error, onRefetch }: Props) {
+export default function TodayPanel({ items, error, onRefetch, fetchedAt }: Props) {
   // Optimistic completed overrides: itemId -> boolean (true = completed)
   const [completedOverrides, setCompletedOverrides] = useState<Map<string, boolean>>(
     () => new Map()
@@ -247,7 +252,7 @@ export default function TodayPanel({ items, error, onRefetch }: Props) {
   return (
     <div className="flex flex-col h-full">
       {/* Panel header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-base">🔴</span>
           <h2 className="text-sm font-semibold text-white">Today</h2>
@@ -258,12 +263,17 @@ export default function TodayPanel({ items, error, onRefetch }: Props) {
           </span>
         )}
       </div>
+      {fetchedAt && (
+        <p className="text-[10px] text-white/20 mb-4">synced {syncedAt(fetchedAt)}</p>
+      )}
+      {!fetchedAt && <div className="mb-4" />}
 
       {error && <ErrorBanner message="Could not read action_items.md. Check file format." />}
 
       {!error && visible.length === 0 && (
-        <div className="flex-1 flex items-center justify-center py-8">
-          <p className="text-white/30 text-sm text-center">Nothing due today.</p>
+        <div className="flex-1 flex flex-col items-center justify-center py-10 gap-1">
+          <p className="text-white/40 text-sm text-center">Clear day ahead.</p>
+          <p className="text-white/20 text-xs text-center">No overdue or due-today items.</p>
         </div>
       )}
 

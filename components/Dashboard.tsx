@@ -8,6 +8,9 @@ import HorizonPanel from './HorizonPanel';
 import PipelinePanel from './PipelinePanel';
 import LoadingState from './LoadingState';
 import ErrorBanner from './ErrorBanner';
+import NudgeBanner from './NudgeBanner';
+import QuestionPanel from './QuestionPanel';
+import { generateQuestions } from '@/lib/questions';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -149,6 +152,15 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Nudge banner */}
+      {data && (
+        <NudgeBanner
+          actionItems={data.actionItems.data}
+          leads={data.pipeline.data}
+          projects={data.projects.data}
+        />
+      )}
+
       {/* Main content */}
       {data && (
         <main className="p-4 sm:p-5 flex flex-col lg:flex-row gap-4 lg:items-start">
@@ -159,6 +171,7 @@ export default function Dashboard() {
                 items={data.actionItems.data}
                 error={data.actionItems.error}
                 onRefetch={() => fetchData(true)}
+                fetchedAt={data.fetchedAt}
               />
             </div>
           </aside>
@@ -170,6 +183,7 @@ export default function Dashboard() {
                 leads={data.pipeline.data}
                 stages={data.pipelineStages}
                 error={data.pipeline.error}
+                fetchedAt={data.fetchedAt}
               />
             </div>
 
@@ -178,8 +192,22 @@ export default function Dashboard() {
                 projects={data.projects.data}
                 error={data.projects.error}
                 isMobile={isMobile}
+                fetchedAt={data.fetchedAt}
               />
             </div>
+
+            {(() => {
+              const questions = generateQuestions(
+                data.actionItems.data,
+                data.pipeline.data,
+                data.projects.data,
+              );
+              return questions.length > 0 ? (
+                <div className="bg-[#0d1117] border border-white/[0.08] rounded-2xl p-5">
+                  <QuestionPanel questions={questions} onRefetch={() => fetchData(true)} />
+                </div>
+              ) : null;
+            })()}
           </div>
         </main>
       )}
