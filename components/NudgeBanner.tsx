@@ -39,7 +39,10 @@ function computeNudges(
     const diffDays = stalest.lastContact
       ? Math.round((Date.now() - stalest.lastContact.getTime()) / (1000 * 60 * 60 * 24))
       : null;
-    const ago = diffDays != null ? `${diffDays}d ago` : 'a while ago';
+    const ago = diffDays == null ? 'a while ago'
+      : diffDays > 365 ? 'over a year ago'
+      : diffDays > 60 ? `${Math.round(diffDays / 30)}mo ago`
+      : `${diffDays}d ago`;
     nudges.push(
       n === 1
         ? `${stalest.name} has gone quiet — last touched ${ago}.`

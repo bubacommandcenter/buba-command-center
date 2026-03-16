@@ -12,8 +12,11 @@ export type Question = {
   action: QuestionAction;
 };
 
-function daysAgo(d: Date): number {
-  return Math.round((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+function daysAgo(d: Date): string {
+  const n = Math.round((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (n > 365) return 'over a year';
+  if (n > 60) return `${Math.round(n / 30)}mo`;
+  return `${n}d`;
 }
 
 export function generateQuestions(
