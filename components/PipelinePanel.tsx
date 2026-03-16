@@ -255,7 +255,7 @@ export default function PipelinePanel({ leads, stages, error }: Props) {
           next.delete(lead.id);
           return next;
         });
-      } catch (err) {
+      } catch {
         setLeadErrors((prev) =>
           new Map(prev).set(lead.id, "Couldn't save — try again")
         );

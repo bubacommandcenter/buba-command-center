@@ -3,12 +3,6 @@ import { Project, ParseResult } from '../types';
 const TODAY = new Date();
 TODAY.setHours(0, 0, 0, 0);
 
-function weeksFromToday(n: number): Date {
-  const d = new Date(TODAY);
-  d.setDate(d.getDate() + n * 7);
-  return d;
-}
-
 function mapStatus(raw: string): Project['status'] {
   const s = raw.toLowerCase();
   if (s.includes('progress') || s.includes('active') || s.includes('live')) return 'active';
@@ -52,7 +46,7 @@ export function parseProjects(markdown: string): ParseResult<Project> {
     };
 
     // Check for Status first, then fall back to Completed (for completed projects)
-    let statusRaw = field('Status') ?? field('status') ?? field('Completed') ?? field('completed') ?? 'active';
+    const statusRaw = field('Status') ?? field('status') ?? field('Completed') ?? field('completed') ?? 'active';
     const priorityRaw = field('Priority') ?? field('priority') ?? 'p3';
     const nextAction = field('Next Action') ?? field('Next action') ?? null;
     const ownerRaw = field('Owner') ?? null;
