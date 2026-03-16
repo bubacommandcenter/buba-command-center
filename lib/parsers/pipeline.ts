@@ -47,6 +47,16 @@ function extractField(body: string, label: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+function normalizeStage(stage: string): string {
+  // Handle compound stages like "Interested / Confirmed" → "Confirmed"
+  // Take the last stage in a "/" separated list as the most advanced
+  if (stage.includes('/')) {
+    const parts = stage.split('/').map(s => s.trim());
+    return parts[parts.length - 1];
+  }
+  return stage;
+}
+
 export function parsePipeline(markdown: string): {
   result: ParseResult<PipelineLead>;
   stages: string[];
@@ -76,13 +86,15 @@ export function parsePipeline(markdown: string): {
 
     const stageRaw = extractField(body, 'Stage') ?? '';
     // Normalize stage: strip emoji, ⚠️ prefixes, extra notes
-    const stage = stageRaw
+    let stage = stageRaw
       .replace(/[⚠️✅🔴🟡🟢]/g, '')
       .split('—')[0]
       .split('(')[0]
       .split('→')[0]
       .replace(/\s+/g, ' ')
       .trim();
+    // Handle compound stages like "Interested / Confirmed" → "Confirmed"
+    stage = normalizeStage(stage);
 
     const lastActivityRaw = extractField(body, 'Last Activity');
     let lastContact: Date | null = null;

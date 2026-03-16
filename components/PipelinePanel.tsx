@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { PipelineLead } from '@/lib/types';
 import ErrorBanner from './ErrorBanner';
 
@@ -51,61 +51,140 @@ function LeadCard({
   lead,
   isExpanded,
   onToggleExpand,
+  isEditing,
+  editValue,
+  onEditChange,
+  onEditSave,
+  onEditCancel,
+  onEditStart,
+  isSaving,
+  errorMessage,
 }: {
   lead: PipelineLead;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  isEditing: boolean;
+  editValue: string;
+  onEditChange: (value: string) => void;
+  onEditSave: () => void;
+  onEditCancel: () => void;
+  onEditStart: () => void;
+  isSaving: boolean;
+  errorMessage: string | null;
 }) {
   const meta = TYPE_META[lead.type] ?? TYPE_META.other;
 
   return (
-    <button
-      onClick={onToggleExpand}
-      className={`w-full text-left rounded-xl px-3 py-3 space-y-2.5 border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
+    <div
+      className={`rounded-xl border transition-colors duration-150 ${
         lead.isStale
           ? 'bg-amber-500/[0.04] border-amber-500/30'
           : 'bg-white/[0.04] border-white/[0.07]'
       }`}
     >
-      {/* Name + stale flag + chevron */}
-      <div className="flex items-start justify-between gap-2">
-        <p className={`text-[13px] font-semibold text-white leading-snug ${!isExpanded ? 'line-clamp-2' : ''}`}>
-          {lead.name}
-        </p>
-        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-          {lead.isStale && (
-            <span className="text-[10px] font-bold text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded">
-              STALE
-            </span>
-          )}
-          <ChevronIcon up={isExpanded} />
+      {/* Header — clickable to expand/collapse */}
+      <button
+        onClick={onToggleExpand}
+        className="w-full text-left px-3 py-3 space-y-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+      >
+        {/* Name + stale flag + chevron */}
+        <div className="flex items-start justify-between gap-2">
+          <p className={`text-[13px] font-semibold text-white leading-snug ${!isExpanded ? 'line-clamp-2' : ''}`}>
+            {lead.name}
+          </p>
+          <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+            {lead.isStale && (
+              <span className="text-[10px] font-bold text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded">
+                STALE
+              </span>
+            )}
+            <ChevronIcon up={isExpanded} />
+          </div>
         </div>
-      </div>
 
-      {/* Type + last contact */}
-      <div className="flex items-center gap-2">
-        <span className={`text-[11px] px-2 py-0.5 rounded-md font-medium ${meta.color}`}>
-          {meta.emoji} {lead.type}
-        </span>
-        <span className="text-[11px] text-white/35">
-          {humanLastContact(lead.lastContact)}
-        </span>
-      </div>
+        {/* Type + last contact */}
+        <div className="flex items-center gap-2">
+          <span className={`text-[11px] px-2 py-0.5 rounded-md font-medium ${meta.color}`}>
+            {meta.emoji} {lead.type}
+          </span>
+          <span className="text-[11px] text-white/35">
+            {humanLastContact(lead.lastContact)}
+          </span>
+        </div>
 
-      {/* Next step */}
-      {lead.nextStep && (
-        <p className={`text-[11px] text-white/50 leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}>
-          {lead.nextStep}
-        </p>
+        {/* Next step (or editing UI) */}
+        {!isEditing && lead.nextStep && (
+          <p className={`text-[11px] text-white/50 leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}>
+            {lead.nextStep}
+          </p>
+        )}
+      </button>
+
+      {/* Expanded content */}
+      {isExpanded && (
+        <div className="px-3 pb-3 pt-0 space-y-2.5 border-t border-white/[0.06]">
+          {/* Notes */}
+          {lead.notes && (
+            <p className="text-[11px] text-white/35 leading-relaxed">
+              <span className="text-white/50 font-medium">Notes:</span> {lead.notes}
+            </p>
+          )}
+
+          {/* Edit next step */}
+          {isEditing ? (
+            <div
+              className="space-y-2 pt-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <textarea
+                autoFocus
+                value={editValue}
+                onChange={(e) => onEditChange(e.target.value)}
+                disabled={isSaving}
+                placeholder="Add next step..."
+                className="w-full px-2 py-1.5 text-[11px] bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-white/40 disabled:opacity-50"
+                rows={2}
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditCancel();
+                  }}
+                  disabled={isSaving}
+                  className="text-[10px] px-2 py-1 rounded bg-white/10 text-white/60 hover:bg-white/20 disabled:opacity-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditSave();
+                  }}
+                  disabled={isSaving}
+                  className="text-[10px] px-2 py-1 rounded bg-green-500/20 text-green-400 hover:bg-green-500/30 disabled:opacity-50 transition-colors"
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+              {errorMessage && (
+                <p className="text-[10px] text-red-400">{errorMessage}</p>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditStart();
+              }}
+              className="text-[10px] px-2 py-1 rounded bg-white/10 text-white/60 hover:bg-white/20 transition-colors w-full text-left"
+            >
+              ✏️ Edit next step
+            </button>
+          )}
+        </div>
       )}
-
-      {/* Notes — only visible when expanded */}
-      {isExpanded && lead.notes && (
-        <p className="text-[11px] text-white/35 leading-relaxed border-t border-white/[0.06] pt-2 mt-1">
-          {lead.notes}
-        </p>
-      )}
-    </button>
+    </div>
   );
 }
 
@@ -117,6 +196,10 @@ interface Props {
 
 export default function PipelinePanel({ leads, stages, error }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Map<string, string>>(new Map());
+  const [leadErrors, setLeadErrors] = useState<Map<string, string>>(new Map());
 
   // Only show stages that have at least one lead
   const visibleStages = stages.filter((stage) =>
@@ -130,6 +213,58 @@ export default function PipelinePanel({ leads, stages, error }: Props) {
   const activeStages = visibleStages.length > 0 ? visibleStages : fallbackStages;
 
   const staleCount = leads.filter((l) => l.isStale).length;
+
+  const handleEditSave = useCallback(
+    async (lead: PipelineLead) => {
+      const newNextStep = editValues.get(lead.id) ?? lead.nextStep ?? '';
+      setSavingId(lead.id);
+      setLeadErrors((prev) => {
+        const next = new Map(prev);
+        next.delete(lead.id);
+        return next;
+      });
+
+      try {
+        const res = await fetch('/api/drive/update-lead', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leadId: lead.id, nextStep: newNextStep }),
+        });
+
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+
+        if (res.status === 409) {
+          setLeadErrors((prev) =>
+            new Map(prev).set(lead.id, 'File was updated elsewhere — refreshing...')
+          );
+          setEditingId(null);
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+        }
+
+        // Success — clear edit state
+        setEditingId(null);
+        setEditValues((prev) => {
+          const next = new Map(prev);
+          next.delete(lead.id);
+          return next;
+        });
+      } catch (err) {
+        setLeadErrors((prev) =>
+          new Map(prev).set(lead.id, "Couldn't save — try again")
+        );
+      } finally {
+        setSavingId(null);
+      }
+    },
+    [editValues]
+  );
 
   return (
     <div>
@@ -180,6 +315,27 @@ export default function PipelinePanel({ leads, stages, error }: Props) {
                         onToggleExpand={() =>
                           setExpandedId(expandedId === lead.id ? null : lead.id)
                         }
+                        isEditing={editingId === lead.id}
+                        editValue={editValues.get(lead.id) ?? lead.nextStep ?? ''}
+                        onEditChange={(value) =>
+                          setEditValues((prev) => new Map(prev).set(lead.id, value))
+                        }
+                        onEditStart={() => {
+                          setEditingId(lead.id);
+                          setExpandedId(lead.id);
+                          setEditValues((prev) => new Map(prev).set(lead.id, lead.nextStep ?? ''));
+                        }}
+                        onEditSave={() => handleEditSave(lead)}
+                        onEditCancel={() => {
+                          setEditingId(null);
+                          setEditValues((prev) => {
+                            const next = new Map(prev);
+                            next.delete(lead.id);
+                            return next;
+                          });
+                        }}
+                        isSaving={savingId === lead.id}
+                        errorMessage={leadErrors.get(lead.id) ?? null}
                       />
                     ))}
                   </div>

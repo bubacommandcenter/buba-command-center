@@ -51,7 +51,8 @@ export function parseProjects(markdown: string): ParseResult<Project> {
       return match ? match[1].trim() : null;
     };
 
-    const statusRaw = field('Status') ?? field('status') ?? 'active';
+    // Check for Status first, then fall back to Completed (for completed projects)
+    let statusRaw = field('Status') ?? field('status') ?? field('Completed') ?? field('completed') ?? 'active';
     const priorityRaw = field('Priority') ?? field('priority') ?? 'p3';
     const nextAction = field('Next Action') ?? field('Next action') ?? null;
     const ownerRaw = field('Owner') ?? null;
@@ -59,7 +60,7 @@ export function parseProjects(markdown: string): ParseResult<Project> {
 
     // Dates: look for date patterns in the section
     // The projects.md doesn't have explicit start/target date fields,
-    // so we use today as start and default 6 weeks for target
+    // so we use today as start and null for target (no fake deadlines)
     const targetMatch = body.match(/(?:target|deadline|by)\s+([A-Za-z]+\s+\d{1,2}(?:,?\s*\d{4})?)/i);
     let targetDate: Date | null = null;
     if (targetMatch) {
@@ -73,7 +74,7 @@ export function parseProjects(markdown: string): ParseResult<Project> {
       status: mapStatus(statusRaw),
       priority: mapPriority(priorityRaw),
       startDate: new Date(TODAY),
-      targetDate: targetDate ?? weeksFromToday(6),
+      targetDate,
       nextAction,
       owner: ownerRaw,
       notes: notesRaw,
