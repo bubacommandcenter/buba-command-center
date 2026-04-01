@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server';
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
-  // Public paths: login page and NextAuth API
-  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
+  // Public paths: login page, NextAuth API, and cron jobs
+  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth') || pathname.startsWith('/api/cron')) {
     return NextResponse.next();
   }
 
