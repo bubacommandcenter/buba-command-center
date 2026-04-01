@@ -63,6 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       // Forward access token to session so API routes can use it
       (session as any).accessToken = token.accessToken;
+      (session as any).refreshToken = token.refreshToken;
       if (token.error) {
         (session as any).error = token.error;
       }
