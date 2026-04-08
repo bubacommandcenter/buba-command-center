@@ -11,6 +11,7 @@ export type ActionItem = {
   context: string | null;
   status: 'open' | 'complete';
   project: string | null;
+  tier: 'now' | 'this-week' | 'waiting' | null;
 };
 
 export type Project = {
@@ -28,7 +29,7 @@ export type Project = {
 export type PipelineLead = {
   id: string;
   name: string;
-  type: 'catering' | 'office-drop' | 'influencer' | 'pop-up' | 'other';
+  type: 'catering' | 'office-drop' | 'influencer' | 'pop-up' | 'collab' | 'other';
   stage: string;
   lastContact: Date | null;
   isStale: boolean;

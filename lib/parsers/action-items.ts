@@ -64,27 +64,47 @@ function makeId(title: string, dueRaw: string | null): string {
     .replace(/-+/g, '-');
 }
 
-function detectOwnerSection(line: string): string | null {
-  const m = line.match(/^##\s+OPEN\s+—\s+(.+)/i);
-  return m ? m[1].trim() : null;
+type SectionInfo = { owner: string; tier: ActionItem['tier']; stop: boolean };
+
+function detectSection(line: string): SectionInfo | null {
+  // Tiered sections: ## NOW — FRITZ, ## THIS WEEK — FRITZ, ## WAITING — FRITZ
+  const tieredMatch = line.match(/^##\s+(NOW|THIS WEEK|WAITING)\s+—\s+(.+)/i);
+  if (tieredMatch) {
+    const tierRaw = tieredMatch[1].toUpperCase();
+    const owner = tieredMatch[2].trim();
+    const tier: ActionItem['tier'] =
+      tierRaw === 'NOW' ? 'now' : tierRaw === 'THIS WEEK' ? 'this-week' : 'waiting';
+    return { owner, tier, stop: false };
+  }
+  // Classic open sections: ## OPEN — BEN, ## OPEN — GADI, ## OPEN — OTHERS
+  const openMatch = line.match(/^##\s+OPEN\s+—\s+(.+)/i);
+  if (openMatch) return { owner: openMatch[1].trim(), tier: null, stop: false };
+  // CLOSED / COMPLETED — stop adding items
+  if (/^##\s+(CLOSED|COMPLETED)/i.test(line)) return { owner: 'CLOSED', tier: null, stop: true };
+  return null;
 }
 
 export function parseActionItems(markdown: string): ParseResult<ActionItem> {
   const lines = markdown.split('\n');
   const items: ActionItem[] = [];
   let currentOwnerSection = 'FRITZ';
+  let currentTier: ActionItem['tier'] = null;
+  let stopParsing = false;
   let i = 0;
 
   while (i < lines.length) {
     const line = lines[i];
 
-    // Track owner section headings
-    const ownerSection = detectOwnerSection(line);
-    if (ownerSection) {
-      currentOwnerSection = ownerSection;
+    // Track section headings
+    const section = detectSection(line);
+    if (section) {
+      if (section.stop) { stopParsing = true; }
+      else { stopParsing = false; currentOwnerSection = section.owner; currentTier = section.tier; }
       i++;
       continue;
     }
+
+    if (stopParsing) { i++; continue; }
 
     // Match top-level list items: "- [ ]" or "- [x]"
     const itemMatch = line.match(/^-\s+\[([ xX])\]\s+\*\*(.+?)\*\*/);
@@ -159,6 +179,7 @@ export function parseActionItems(markdown: string): ParseResult<ActionItem> {
       context,
       status: isComplete ? 'complete' : 'open',
       project,
+      tier: currentTier,
     });
   }
 

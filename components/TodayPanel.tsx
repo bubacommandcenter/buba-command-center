@@ -4,6 +4,28 @@ import { useState, useCallback } from 'react';
 import { ActionItem } from '@/lib/types';
 import ErrorBanner from './ErrorBanner';
 
+function FritzBoard({ items }: { items: ActionItem[] }) {
+  const top3 = items.slice(0, 3);
+  if (top3.length === 0) return null;
+  return (
+    <div className="mb-4 px-3 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+      <p className="text-[10px] font-bold tracking-widest uppercase text-white/30 mb-2.5">
+        Start here
+      </p>
+      <ol className="space-y-2">
+        {top3.map((item, i) => (
+          <li key={item.id} className="flex items-start gap-2">
+            <span className="text-[11px] font-bold text-white/25 shrink-0 w-4 mt-0.5 tabular-nums">
+              {i + 1}.
+            </span>
+            <p className="text-[12px] text-white/65 leading-snug line-clamp-2">{item.title}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function humanDueDate(item: ActionItem): string {
   if (!item.dueDate) return '';
   if (item.isDueToday) return 'Due today';
@@ -165,10 +187,14 @@ export default function TodayPanel({ items, error, onRefetch, fetchedAt }: Props
   );
   const [itemErrors, setItemErrors] = useState<Map<string, string>>(new Map());
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showThisWeek, setShowThisWeek] = useState(false);
 
-  const visible = items.filter(
-    (x) => x.status === 'open' && (x.isOverdue || x.isDueToday)
+  // NOW tier items (explicit tier, or fall back to overdue/due-today for backward compat)
+  const hasAnyTier = items.some(x => x.tier !== null);
+  const nowItems = items.filter(
+    x => x.status === 'open' && (hasAnyTier ? x.tier === 'now' : (x.isOverdue || x.isDueToday))
   );
+  const thisWeekItems = items.filter(x => x.status === 'open' && x.tier === 'this-week');
 
   function isEffectivelyCompleted(item: ActionItem): boolean {
     return completedOverrides.has(item.id)
@@ -176,18 +202,23 @@ export default function TodayPanel({ items, error, onRefetch, fetchedAt }: Props
       : item.status === 'complete';
   }
 
-  // Sort: open (not completed) first, completed last
-  const sorted = [...visible].sort((a, b) => {
+  // Sort: overdue first, then due today, then rest; completed last
+  const sorted = [...nowItems].sort((a, b) => {
     const aC = isEffectivelyCompleted(a) ? 1 : 0;
     const bC = isEffectivelyCompleted(b) ? 1 : 0;
-    return aC - bC;
+    if (aC !== bC) return aC - bC;
+    if (a.isOverdue && !b.isOverdue) return -1;
+    if (!a.isOverdue && b.isOverdue) return 1;
+    return 0;
   });
 
   const overdue = sorted.filter((x) => x.isOverdue && !isEffectivelyCompleted(x));
   const dueToday = sorted.filter((x) => x.isDueToday && !x.isOverdue && !isEffectivelyCompleted(x));
+  const otherNow = sorted.filter((x) => !x.isOverdue && !x.isDueToday && !isEffectivelyCompleted(x));
   const completed = sorted.filter((x) => isEffectivelyCompleted(x));
 
-  const openCount = visible.filter((x) => !isEffectivelyCompleted(x)).length;
+  const openNowItems = sorted.filter(x => !isEffectivelyCompleted(x));
+  const openCount = openNowItems.length;
 
   const handleToggleComplete = useCallback(
     async (item: ActionItem) => {
@@ -270,14 +301,17 @@ export default function TodayPanel({ items, error, onRefetch, fetchedAt }: Props
 
       {error && <ErrorBanner message="Could not read action_items.md. Check file format." />}
 
-      {!error && visible.length === 0 && (
+      {!error && nowItems.length === 0 && thisWeekItems.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center py-10 gap-1">
           <p className="text-white/40 text-sm text-center">Clear day ahead.</p>
-          <p className="text-white/20 text-xs text-center">No overdue or due-today items.</p>
+          <p className="text-white/20 text-xs text-center">No items in the NOW queue.</p>
         </div>
       )}
 
       <div className="space-y-4 overflow-y-auto flex-1">
+        {/* Fritz's Board — top 3 at a glance */}
+        <FritzBoard items={openNowItems} />
+
         {overdue.length > 0 && (
           <div className="space-y-2">
             <p className="text-[10px] font-bold tracking-widest uppercase text-red-500/70 px-1">
@@ -316,6 +350,25 @@ export default function TodayPanel({ items, error, onRefetch, fetchedAt }: Props
           </div>
         )}
 
+        {otherNow.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-white/40 px-1">
+              Now
+            </p>
+            {otherNow.map((item) => (
+              <ActionCard
+                key={item.id}
+                item={item}
+                isCompleted={isEffectivelyCompleted(item)}
+                onToggleComplete={() => handleToggleComplete(item)}
+                isExpanded={expandedId === item.id}
+                onToggleExpand={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                errorMessage={itemErrors.get(item.id) ?? null}
+              />
+            ))}
+          </div>
+        )}
+
         {completed.length > 0 && (
           <div className="space-y-2">
             <p className="text-[10px] font-bold tracking-widest uppercase text-white/20 px-1">
@@ -332,6 +385,39 @@ export default function TodayPanel({ items, error, onRefetch, fetchedAt }: Props
                 errorMessage={itemErrors.get(item.id) ?? null}
               />
             ))}
+          </div>
+        )}
+
+        {/* This Week — collapsible */}
+        {thisWeekItems.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowThisWeek(v => !v)}
+              className="flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase text-white/25 hover:text-white/45 transition-colors px-1 mb-2 focus:outline-none w-full"
+            >
+              <svg
+                className={`w-3 h-3 transition-transform duration-150 shrink-0 ${showThisWeek ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+              This Week ({thisWeekItems.length})
+            </button>
+            {showThisWeek && (
+              <div className="space-y-2">
+                {thisWeekItems.map((item) => (
+                  <ActionCard
+                    key={item.id}
+                    item={item}
+                    isCompleted={isEffectivelyCompleted(item)}
+                    onToggleComplete={() => handleToggleComplete(item)}
+                    isExpanded={expandedId === item.id}
+                    onToggleExpand={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                    errorMessage={itemErrors.get(item.id) ?? null}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

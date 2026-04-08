@@ -10,6 +10,7 @@ const TYPE_META: Record<string, { emoji: string; color: string }> = {
   'office-drop': { emoji: '🍱', color: 'bg-blue-500/15 text-blue-400' },
   influencer:    { emoji: '📸', color: 'bg-purple-500/15 text-purple-400' },
   'pop-up':      { emoji: '🎉', color: 'bg-orange-500/15 text-orange-400' },
+  collab:        { emoji: '🤝', color: 'bg-indigo-500/15 text-indigo-300' },
   other:         { emoji: '🤝', color: 'bg-white/10 text-white/50' },
 };
 
@@ -292,12 +293,12 @@ export default function PipelinePanel({ leads, stages, error, fetchedAt }: Props
       </div>
       <div className="mb-4" />
 
-      {error && <ErrorBanner message="Could not read collab_pipeline.md. Check file format." />}
+      {error && <ErrorBanner message="Could not read collab files. Check collabs/ folder." />}
 
       {!error && leads.length === 0 && (
         <div className="py-8 flex flex-col items-center gap-1">
-          <p className="text-white/40 text-sm">No leads yet.</p>
-          <p className="text-white/20 text-xs">Add entries to collab_pipeline.md to track outreach.</p>
+          <p className="text-white/40 text-sm">No collabs yet.</p>
+          <p className="text-white/20 text-xs">Add files to collabs/active/ or collabs/confirmed/ to track partnerships.</p>
         </div>
       )}
 

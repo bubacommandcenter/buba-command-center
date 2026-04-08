@@ -26,6 +26,25 @@ function makeId(name: string): string {
 export function parseProjects(markdown: string): ParseResult<Project> {
   const projects: Project[] = [];
 
+  // Parse complex projects table: | [Name](link) | Priority | Status | Next Action |
+  const tableRowRegex = /^\|\s+\[([^\]]+)\]\([^)]+\)\s+\|\s+([^|]+)\|\s+([^|]+)\|\s+([^|]+)\|/gm;
+  let tableMatch;
+  while ((tableMatch = tableRowRegex.exec(markdown)) !== null) {
+    const [, name, priority, status, nextAction] = tableMatch;
+    if (/priority|---|p1|p2|p3/i.test(priority)) continue; // skip header/separator rows
+    projects.push({
+      id: makeId(name.trim()),
+      name: name.trim(),
+      status: mapStatus(status.trim()),
+      priority: mapPriority(priority.trim()),
+      startDate: new Date(TODAY),
+      targetDate: null,
+      nextAction: nextAction.trim() || null,
+      owner: 'Fritz',
+      notes: null,
+    });
+  }
+
   // Split on ### headings under ACTIVE PROJECTS
   const sections = markdown.split(/^###\s+/m);
 
